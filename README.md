@@ -47,6 +47,21 @@ Quick smoke test first: edit `slurm_train.sh` -> `--partition=dev_gpu_a100_il`,
   This can run many hours — keep `--time=24:00:00`, prefer `gpu_h100` (72h) or
   overnight/weekend on `gpu_a100_il` (48h, daytime reservation 8am–8pm).
   The first run also downloads the full dataset (large) into the workspace cache.
+- **Full-scale CTC baseline** (match the Whisper run above for a fair comparison):
+  replace the `srun` line in `slurm_ctc.sh` with:
+  ```bash
+  srun python train_ctc.py \
+      --model facebook/wav2vec2-xls-r-300m \
+      --output_dir "$WS/wav2vec2-eo-full" \
+      --max_train_samples 0 \      # 0 = use the entire train split
+      --max_eval_samples 2000 \
+      --max_steps 20000 \
+      --batch_size 16 \
+      --grad_accum 2 \             # effective batch 32
+      --eval_steps 1000
+  ```
+  CTC usually needs more steps than Whisper to converge (hence 20000 vs 15000).
+  Same dataset, same normalization → WER/CER comparable to the full Whisper run.
 
 ## Experiments to run (maps to the lab tasks)
 | Flag change | What it tests |
