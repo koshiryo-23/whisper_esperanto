@@ -14,16 +14,23 @@ set -euo pipefail
 WS=$(ws_find whisper 2>/dev/null || ws_allocate whisper 60)
 echo "workspace: $WS"
 
-# put ALL caches on the workspace, not home
-export HF_HOME="$WS/hf"
+# big downloads -> workspace (home quota is tiny). NOTE: we do NOT set HF_HOME,
+# so the auth token stays in its default home path and a `huggingface-cli login`
+# done on a login node is still seen by this job.
+export HF_HUB_CACHE="$WS/hf/hub"
 export HF_DATASETS_CACHE="$WS/hf/datasets"
-export TRANSFORMERS_CACHE="$WS/hf/transformers"
-mkdir -p logs "$HF_HOME"
+mkdir -p logs "$WS/hf"
 
 # --- environment ---
 module load devel/cuda/12.4 2>/dev/null || module load devel/cuda || true
 source "$WS/miniforge3/etc/profile.d/conda.sh"
 conda activate whisper
+
+# --- fail fast if not authenticated (Common Voice is gated) ---
+python - <<'PY' || { echo "ERROR: no Hugging Face token. On a login node run:  huggingface-cli login"; echo "then accept terms at https://huggingface.co/datasets/mozilla-foundation/common_voice_17_0"; exit 1; }
+from huggingface_hub import whoami
+print("HF auth OK:", whoami()["name"])
+PY
 
 # --- run ---
 # Whisper Small + LoRA, Polish proxy token. Edit flags for full FT / other model.

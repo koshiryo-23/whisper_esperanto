@@ -12,14 +12,20 @@ set -euo pipefail
 WS=$(ws_find whisper 2>/dev/null || ws_allocate whisper 60)
 echo "workspace: $WS"
 
-export HF_HOME="$WS/hf"
+# big downloads -> workspace; keep HF token in its default home path (see slurm_train.sh)
+export HF_HUB_CACHE="$WS/hf/hub"
 export HF_DATASETS_CACHE="$WS/hf/datasets"
-export TRANSFORMERS_CACHE="$WS/hf/transformers"
-mkdir -p logs "$HF_HOME"
+mkdir -p logs "$WS/hf"
 
 module load devel/cuda/12.4 2>/dev/null || module load devel/cuda || true
 source "$WS/miniforge3/etc/profile.d/conda.sh"
 conda activate whisper
+
+# --- fail fast if not authenticated (Common Voice is gated) ---
+python - <<'PY' || { echo "ERROR: no Hugging Face token. On a login node run:  huggingface-cli login"; echo "then accept terms at https://huggingface.co/datasets/mozilla-foundation/common_voice_17_0"; exit 1; }
+from huggingface_hub import whoami
+print("HF auth OK:", whoami()["name"])
+PY
 
 srun python train_ctc.py \
     --model facebook/wav2vec2-xls-r-300m \
