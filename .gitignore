@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+logs/
+vocab.json
+whisper-eo*/
+wav2vec2-eo*/
+*.out
+*.err
+.DS_Store
