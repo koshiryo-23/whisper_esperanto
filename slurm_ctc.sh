@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
-#SBATCH --time=08:00:00
+#SBATCH --time=24:00:00               # gpu_a100_il max 48h, gpu_h100 max 72h. Lower to queue faster.
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
 set -euo pipefail

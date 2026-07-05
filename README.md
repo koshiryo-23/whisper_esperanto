@@ -26,6 +26,28 @@ comparable — that's the lab's "compare against CTC baseline" task.
 Quick smoke test first: edit `slurm_train.sh` -> `--partition=dev_gpu_a100_il`,
 `--time=00:30:00`, and add `--max_train_samples 500 --max_steps 50`.
 
+## Scale of a run
+- **Default job** (LoRA, `--max_train_samples 10000`, `--max_steps 1500`): finishes
+  in ~1h on one A100. `--time=24:00:00` just caps it; it exits when done.
+- **Full-scale run** (use all Esperanto data, full fine-tune): set
+  `--max_train_samples 0` to use the entire train split (~1900h) and train longer.
+  Replace the `srun` line in `slurm_train.sh` with:
+  ```bash
+  srun python train_whisper.py \
+      --model openai/whisper-small \
+      --language polish \
+      --output_dir "$WS/whisper-eo-small-full" \
+      --max_train_samples 0 \      # 0 = use the entire train split
+      --max_eval_samples 2000 \
+      --max_steps 15000 \
+      --batch_size 16 \
+      --grad_accum 2 \             # effective batch 32
+      --eval_steps 1000
+  ```
+  This can run many hours — keep `--time=24:00:00`, prefer `gpu_h100` (72h) or
+  overnight/weekend on `gpu_a100_il` (48h, daytime reservation 8am–8pm).
+  The first run also downloads the full dataset (large) into the workspace cache.
+
 ## Experiments to run (maps to the lab tasks)
 | Flag change | What it tests |
 |---|---|

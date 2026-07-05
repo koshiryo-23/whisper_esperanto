@@ -4,7 +4,9 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
-#SBATCH --time=08:00:00               # dev queue max is short (~30min) -> lower this there
+#SBATCH --time=24:00:00               # gpu_a100_il max 48h, gpu_h100 max 72h, dev queues 30min.
+                                      # The default LoRA job below finishes in ~1h; lower --time to
+                                      # queue faster, or keep 24h for the full-scale run (see README).
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
 # Verify partitions/time limits on the cluster with:  sinfo -s   /   scontrol show partition
