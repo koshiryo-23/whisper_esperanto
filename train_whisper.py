@@ -10,13 +10,15 @@ multilingual-transfer experiment (see --language).
 Outputs WER and CER on the Common Voice test split.
 """
 import argparse
+import csv
+import os
 import re
 from dataclasses import dataclass
 from typing import Any
 
 import evaluate
 import torch
-from datasets import Audio, load_dataset
+from datasets import Audio, Dataset, load_dataset
 from transformers import (
     Seq2SeqTrainer,
     Seq2SeqTrainingArguments,
@@ -31,6 +33,11 @@ def parse_args():
                    help="openai/whisper-small or openai/whisper-base")
     p.add_argument("--dataset", default="mozilla-foundation/common_voice_17_0")
     p.add_argument("--lang_code", default="eo", help="Common Voice config (eo = Esperanto)")
+    p.add_argument("--local_data_dir", default=None,
+                   help="Load from a locally extracted Common Voice locale dir "
+                        "(contains clips/ and train.tsv/test.tsv) instead of HuggingFace. "
+                        "Common Voice left HF in Oct 2025; download from "
+                        "https://mozilladatacollective.com and point here (e.g. .../cv-corpus-.../eo).")
     p.add_argument("--language", default="polish",
                    help="Whisper proxy language token used during fine-tuning "
                         "(Esperanto has none). Try 'polish', 'italian', 'croatian'.")
@@ -55,6 +62,22 @@ _PUNCT = re.compile(r"[^\w\s]", re.UNICODE)
 
 def normalize(text: str) -> str:
     return _PUNCT.sub("", text.lower()).strip()
+
+
+def load_local_cv(data_dir: str, split: str) -> Dataset:
+    """Build a Dataset from a locally extracted Common Voice locale dir.
+
+    `data_dir` holds clips/ and <split>.tsv (Mozilla Data Collective layout).
+    The "audio" column holds file paths; caller casts it to Audio() to decode.
+    """
+    tsv = os.path.join(data_dir, f"{split}.tsv")
+    clips = os.path.join(data_dir, "clips")
+    paths, sentences = [], []
+    with open(tsv, encoding="utf-8") as f:
+        for row in csv.DictReader(f, delimiter="\t"):
+            paths.append(os.path.join(clips, row["path"]))
+            sentences.append(row["sentence"])
+    return Dataset.from_dict({"audio": paths, "sentence": sentences})
 
 
 @dataclass
@@ -84,10 +107,14 @@ def main():
     processor.tokenizer.set_prefix_tokens(language=args.language, task="transcribe")
 
     # ---- data ----
-    train = load_dataset(args.dataset, args.lang_code, split="train",
-                         token=True, trust_remote_code=True)
-    test = load_dataset(args.dataset, args.lang_code, split="test",
-                        token=True, trust_remote_code=True)
+    if args.local_data_dir:
+        train = load_local_cv(args.local_data_dir, "train")
+        test = load_local_cv(args.local_data_dir, "test")
+    else:
+        train = load_dataset(args.dataset, args.lang_code, split="train",
+                             token=True, trust_remote_code=True)
+        test = load_dataset(args.dataset, args.lang_code, split="test",
+                            token=True, trust_remote_code=True)
     if args.max_train_samples:
         train = train.shuffle(seed=42).select(range(min(args.max_train_samples, len(train))))
     if args.max_eval_samples:
